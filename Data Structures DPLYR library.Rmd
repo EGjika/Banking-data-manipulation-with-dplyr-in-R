@@ -1,0 +1,279 @@
+---
+title: "Data structures in R"
+author: "Eralda Gjika"
+date: "February 2022"
+output:
+  word_document: default
+  html_notebook: default
+subtitle: GGPLOT and Esquisse library
+---
+
+
+### Get started with R Markdown 
+
+Reference:
+https://rmarkdown.rstudio.com/articles_intro.html 
+https://rmarkdown.rstudio.com/lesson-1.html
+
+## Data sctructures in R
+Most of the data in R are saved in a dataframe format or tibble format . This will help your data analysis and also make easy the use of many libraries in R.
+
+```{r}
+library(readr)# read cvs
+library(readxl) #read xls
+library(dplyr)
+library(knitr)      # web widget
+library(tidyverse)  # data manipulation
+library(data.table) # fast file reading
+library(kableExtra) # nice table html formatting 
+library(gridExtra)  # arranging ggplot in grid
+library(caTools)    # split 
+library(plotrix)
+library(MASS)
+```
+
+### Import data
+
+Data used in this material are downloaded from this link: https://www.kaggle.com/sonujha090/bank-marketing
+
+```{r}
+data_bank
+```
+
+```{r}
+data_bank_tibble<-tibble(data_bank)
+head(data_bank_tibble)
+
+```
+
+Looking at the dataset
+```{r}
+# View(data_bank)# view dataset
+head(data_bank)# head of rows
+summary(data_bank)# summary statistics
+str(data_bank) # structure of dataset
+nrow(data_bank)# number of rows
+ncol(data_bank)# number of columns
+dim(data_bank)# dimensions of dataframe
+```
+
+### If we want to code binary data 
+
+Lets try it in "loan" variable with categories (yes, no). We are going to use the ifelse() function.
+```{r}
+table(data_bank$housing)
+table(data_bank$marital,data_bank$job)# contigency table
+
+# Now let see the difference
+data_bank$housing= ifelse(data_bank$housing=='yes',1,0)
+
+head(data_bank$housing,10)
+table(data_bank$housing)
+```
+## Train and test data
+Let's work with our first format dataset. We will import it again here.
+
+```{r}
+
+n.train<-0.8*nrow(data_bank)# number of observ in training set
+train<-head(data_bank,n.train)# you may use sample
+nrow(train) # length of training data
+
+n.test<-0.2*nrow(data_bank)
+test<-tail(data_bank,n.test)
+nrow(test) # length of testing data
+```
+
+
+### Check for "missing values, NA"
+```{r}
+sum(!complete.cases(data_bank)) # it will turn 0 because this dataset is cleaned from NA-s
+```
+### Check for dublicates in rows 
+```{r}
+sum(duplicated(data_bank))
+# it will return the number of duplicated , here it will return 0 because we have cleaned the duplicate
+```
+
+### Descriptive statistics
+
+```{r}
+summary(data_bank_tibble)
+summary(data_bank_tibble$age)# only for age variable
+summary(data_bank_tibble[,3:6])# only for variables in columns 3 up to 6
+```
+### Data Wrangling 
+#### dplyr package
+
+```{r}
+library(dplyr)
+```
+
+#### filter()
+filter() is a function in dplyr that takes logical expressions and returns the rows for which all are TRUE.
+
+
+```{r}
+# filter individuals of age less than 25 years old
+filter(data_bank, age < 25) 
+
+# filter individuals housing == yes
+filter(data_bank, housing== "yes")
+
+# individuals with profession management and age =30 years old
+filter(data_bank, job == "management", age == 30)
+
+# individuals with profession management and age less than 25 years old 
+filter(data_bank, job == "management", age < 25)
+
+# we want to display in job the retired and management professions
+filter(data_bank, job %in% c("retired", "management")) 
+```
+
+### Exercise
+a. What was the average age of "management" professionals housing "yes".
+
+Hint: you can do this in 2 steps by assigning a variable and then using the mean() function.
+
+###### Solution. a
+```{r}
+av.age <- filter(data_bank, job == "management", housing== "yes")  
+mean(av.age$age)  
+```
+
+
+b. What was the average balance of the loan for secondary education individuals?  
+
+
+### select() 
+
+We use select() to subset the data on variables or columns.
+
+We can select multiple columns with a comma, after we specify the data frame (data_bank).
+
+#### The logic of select():
+
+   select(df, A, B ,C): Select the variables A, B and C from df dataset.
+   select(df, A:C) : Select all variables from A to C from df dataset.
+   select(df, -C, -A): Exclude C from the dataset from df dataset.	
+
+Sometimes you may notice an ERROR after applying function select(); this is likely that you are either using a package besides dplyr that also has a select() function or you just forgot to load the dplyr package with library(dplyr). If this happens you may follow the syntax below (data_bank %>% dplyr::select(age))
+
+```{r}
+library(dplyr)
+# data_bank %>% select(education) # Error in select(., education) : unused argument (education)
+```
+We can use this syntax of obtaining the results with select()
+```{r}
+head(select(data_bank,age))
+head(data_bank %>% dplyr::select(age))
+
+data_bank %>% dplyr::select(education)
+
+# or select 1st variable (age)
+head(data_bank[,c(1,5,10)]) 
+
+data_bank %>% dplyr::select(age, marital, duration) 
+```
+ 
+#### De-select variables  
+We can also use - (minus) to deselect columns. 
+The code below will de-select from our dataset the variables age and marital.
+
+```{r}
+D2<-data_bank %>% dplyr::select(-age, -marital) 
+head(D2)
+```
+
+#### We can use the pipe to chain those two operations together.
+
+We want to filter for profession (job - variable) the "management" and from these individuals to show their "education" and "loan" variable.
+
+#### Exercise
+How can you do it for individuals job "management" status to show their "age" and "balance"
+
+```{r}
+data_bank.1 <- data_bank %>% 
+  filter(job == "management") %>% 
+  dplyr::select(education,loan) 
+
+data_bank.1
+```
+
+### mutate() adds new variables to dataframe
+
+Let suppose we want to add a variable combining two or more existing variables. Or we want to add a new variable from an existing vector which is not part of the dataframe.
+
+Let's suppose I want to see the day balance. (balance/duration).
+
+Adding a new variable from two existing variables of the dataframe, named "day.balance"
+```{r}
+D3<-data_bank %>%
+  mutate(day.balance = round(balance/duration,2))
+D3
+```
+
+I can add from another existing variable outside the dataset.
+```{r}
+X<-sample(c("a","b","c"),length(data_bank$age),replace=TRUE)
+X1<-sample(c("a","b","c"),nrow(data_bank),replace=TRUE)
+
+length(X)
+data_bank %>% mutate(X)
+```
+
+### group_by() operates on groups
+
+summarize() will actually only keep the columns that are grouped_by or summarized. 
+
+ungroup() removes the grouping and it’s good to get in the habit of using it after a group_by().
+```{r}
+data_bank %>%
+  filter(age == 30) %>%
+  group_by(marital) %>%
+  summarize(mean(duration)) %>%
+  ungroup()
+```
+
+### arrange()
+
+arrange() function is ordered alphabetically from A to Z.
+
+```{r}
+# arrange by job
+data_bank %>%
+   group_by(marital,job) %>%
+  summarize(mean(duration)) %>%
+  arrange(job)
+
+# arrange by marital status
+ data_bank %>%
+   group_by(marital,job) %>%
+  summarize(mean(duration)) %>%
+  arrange(marital) 
+```
+Try to combine by yourself the above functions. 
+
+### Exercise
+What is the maximum duration for all jobs at age 30?
+
+### Exercise
+Try to understand what the below command will give you as an output?
+```{r}
+library(tidyverse) ## install.packages('tidyverse')
+## summarize
+data_bank.2 <- data_bank %>% 
+  dplyr::select(-contact, -poutcome) %>% 
+  dplyr::group_by(marital) %>%
+  dplyr::mutate(day.balance = round(balance/duration,2)) %>%
+  dplyr::summarize(min_day.balance = min(day.balance)) %>%
+  dplyr::ungroup() 
+
+```
+
+
+
+
+### February 2022
+#### Eralda Gjika (Dhamo)
+
